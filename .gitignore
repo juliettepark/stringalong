@@ -1,0 +1,29 @@
+# Frontend dependencies and local environment
+node_modules/
+.env
+.env.local
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Python virtual environments
+.venv/
+venv/
+env/
+
+# Test/tool caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Generated media and logs
+*.wav
+*.mp3
+*.log
+*.tmp
+heatmap_preview_*.png
+
+# macOS
+.DS_Store
