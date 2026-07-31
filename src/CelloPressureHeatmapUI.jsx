@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import PracticePage from "./practice/PracticePage.jsx";
 
 // ── SVG Icon Components ──────────────────────────────────────────────────────
 
@@ -50,9 +51,10 @@ const IcoBluetooth = () => (
 // ── Sidebar ──────────────────────────────────────────────────────────────────
 
 const NAV_ITEMS = [
-  { id: "overview",     label: "Overview",      Icon: IcoGrid },
-  { id: "heatmap",     label: "Haptics",        Icon: IcoTarget },
-  { id: "settings",    label: "Settings",       Icon: IcoSettings },
+  { id: "overview", label: "Overview", Icon: IcoGrid },
+  { id: "practice", label: "Practice", Icon: IcoClock },
+  { id: "heatmap", label: "Haptics", Icon: IcoTarget },
+  { id: "settings", label: "Settings", Icon: IcoSettings },
 ];
 
 const STRING_NAMES = ["C", "G", "D", "A"];
@@ -1283,14 +1285,11 @@ export default function CelloPressureHeatmapUI() {
           />
 
           {activeNav === "overview" ? (
-            <OverviewPage
-              liveData={liveData}
-            />
+            <OverviewPage liveData={liveData} />
+          ) : activeNav === "practice" ? (
+            <PracticePage />
           ) : (
-            <DetailPage
-              activeNav={activeNav}
-              liveData={liveData}
-            />
+            <DetailPage activeNav={activeNav} liveData={liveData} />
           )}
         </div>
       </div>
