@@ -46,6 +46,13 @@ img {
   -webkit-user-drag: none;
 }
 
+/* OSMD cursor is a 1px-tall PNG stretched via width/height attrs.
+   Tailwind Preflight's `img { height: auto }` collapses it to 1px. */
+.osmd-container img[id^="cursorImg-"] {
+  max-width: none;
+  object-fit: fill;
+}
+
 ::selection {
   background: rgba(99, 102, 241, 0.18);
 }
