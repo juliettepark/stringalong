@@ -1,5 +1,25 @@
 import React from "react";
 
+/** First-position stopped-note catalog shared by Overview heatmap + practice mapper. */
+export const HEATMAP_NOTE_TARGETS = [
+  { row: 2, rowPos: 2.18, col: 0, finger: 1, note: "D2" },
+  { row: 7, rowPos: 7.11, col: 0, finger: 2, note: "Eb2" },
+  { row: 12, rowPos: 11.76, col: 0, finger: 3, note: "E2" },
+  { row: 16, rowPos: 16.16, col: 0, finger: 4, note: "F2" },
+  { row: 2, rowPos: 2.18, col: 1, finger: 1, note: "A2" },
+  { row: 7, rowPos: 7.11, col: 1, finger: 2, note: "Bb2" },
+  { row: 12, rowPos: 11.76, col: 1, finger: 3, note: "B2" },
+  { row: 16, rowPos: 16.16, col: 1, finger: 4, note: "C3" },
+  { row: 2, rowPos: 2.18, col: 2, finger: 1, note: "E3" },
+  { row: 7, rowPos: 7.11, col: 2, finger: 2, note: "F3" },
+  { row: 12, rowPos: 11.76, col: 2, finger: 3, note: "F#3" },
+  { row: 16, rowPos: 16.16, col: 2, finger: 4, note: "G3" },
+  { row: 2, rowPos: 2.18, col: 3, finger: 1, note: "B3" },
+  { row: 7, rowPos: 7.11, col: 3, finger: 2, note: "C4" },
+  { row: 12, rowPos: 11.76, col: 3, finger: 3, note: "C#4" },
+  { row: 16, rowPos: 16.16, col: 3, finger: 4, note: "D4" },
+];
+
 const FINGERBOARD_IMAGE_WIDTH = 1570;
 const FINGERBOARD_IMAGE_HEIGHT = 2777;
 const FINGERBOARD_POSITION_ANCHORS = [
