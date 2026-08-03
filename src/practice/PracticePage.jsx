@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { OpenSheetMusicDisplay } from "opensheetmusicdisplay";
 import { PRACTICE_PIECES } from "./practicePieces.js";
 import PlayPauseControls from "./PlayPauseControls.jsx";
+import ScoreDropdown from "./ScoreDropdown.jsx";
 
 /**
  * First-position cello pitches (A4 = 440 Hz), including open strings.
@@ -60,7 +61,7 @@ export default function PracticePage() {
   const isPlayingRef = useRef(false);
   const [status, setStatus] = useState("Loading score…");
   const [bpm, setBpm] = useState(80);
-  const [selectedPiece, setSelectedPiece] = useState(PRACTICE_PIECES[0]);
+  const [selectedPiece, setSelectedPiece] = useState(PRACTICE_PIECES[1]);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentNote, setCurrentNote] = useState(null);
 
@@ -131,6 +132,8 @@ export default function PracticePage() {
       disableCursor: false,
       cursorsOptions: [{ type: 0, color: "#33e02f", alpha: 0.5, follow: false }],
     });
+
+    osmd.EngravingRules.RenderXMeasuresPerLineAkaSystem = 4; // e.g. 4 bars per line
 
     osmdRef.current = osmd;
 
@@ -240,6 +243,19 @@ export default function PracticePage() {
     setCurrentNote(osmd.cursor.NotesUnderCursor()[0] ?? null);
   };
 
+  const handlePieceChange = (event) => {
+    const piece = PRACTICE_PIECES.find((p) => p.id === event.target.value);
+    if (!piece || piece.id === selectedPiece?.id) {
+      console.log("Unable to find piece corresponding to id:", event.target.value);
+      return;
+    }
+
+    clearTimer();
+    isPlayingRef.current = false;
+    setIsPlaying(false);
+    setSelectedPiece(piece);
+  };
+
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 lg:p-6">
       <div className="shrink-0 rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-[0_18px_50px_rgba(0,0,0,0.22)]">
@@ -255,20 +271,28 @@ export default function PracticePage() {
       </div>
 
       <div className="flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 shadow-[0_18px_50px_rgba(0,0,0,0.22)] sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 items-center gap-3">
-          <span
-            className={`h-2.5 w-2.5 shrink-0 rounded-full ${
-              isPlaying ? "bg-emerald-400" : scoreReady ? "bg-slate-500" : "bg-amber-400"
-            }`}
-          />
-          <div className="min-w-0">
-            <div className="text-sm font-semibold text-slate-100">
-              {isPlaying ? "Playing" : scoreReady ? "Stopped" : status}
-            </div>
-            <div className="truncate text-xs text-slate-400">
-              {selectedPiece?.title ?? "No piece"} · {bpm} BPM · {status}
+        <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="flex min-w-0 items-center gap-3">
+            <span
+              className={`h-2.5 w-2.5 shrink-0 rounded-full ${
+                isPlaying ? "bg-emerald-400" : scoreReady ? "bg-slate-500" : "bg-amber-400"
+              }`}
+            />
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-slate-100">
+                {isPlaying ? "Playing" : scoreReady ? "Stopped" : status}
+              </div>
+              <div className="truncate text-xs text-slate-400">
+                {selectedPiece?.title ?? "No piece"} · {bpm} BPM · {status}
+              </div>
             </div>
           </div>
+
+          <ScoreDropdown
+            pieces={PRACTICE_PIECES}
+            selectedPieceId={selectedPiece?.id}
+            onChange={handlePieceChange}
+          />
         </div>
 
         <PlayPauseControls
