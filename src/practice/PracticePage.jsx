@@ -3,6 +3,7 @@ import { OpenSheetMusicDisplay } from "opensheetmusicdisplay";
 import { PRACTICE_PIECES } from "./practicePieces.js";
 import PlayPauseControls from "./PlayPauseControls.jsx";
 import ScoreDropdown from "./ScoreDropdown.jsx";
+import BpmSlider from "./BpmSlider.jsx";
 
 /**
  * First-position cello pitches (A4 = 440 Hz), including open strings.
@@ -59,6 +60,7 @@ export default function PracticePage() {
   const timerRef = useRef(null);
   // make a ref to ensure value is never stale for timer logic
   const isPlayingRef = useRef(false);
+  const bpmRef = useRef(80);
   const [status, setStatus] = useState("Loading score…");
   const [bpm, setBpm] = useState(80);
   const [selectedPiece, setSelectedPiece] = useState(PRACTICE_PIECES[1]);
@@ -67,10 +69,14 @@ export default function PracticePage() {
 
   const scoreReady = status === "Ready";
 
-  // Keep a ref in sync so timeouts don't see a stale isPlaying from an old render.
+  // Keep refs in sync so timeouts don't see stale values from an old render.
   useEffect(() => {
     isPlayingRef.current = isPlaying;
   }, [isPlaying]);
+
+  useEffect(() => {
+    bpmRef.current = bpm;
+  }, [bpm]);
 
   const clearTimer = () => {
     if (timerRef.current != null) {
@@ -95,10 +101,11 @@ export default function PracticePage() {
   };
 
   const dwellMsForNote = (note) => {
-    if (!note?.Length) return (60 / bpm) * 1000;
+    const currentBpm = bpmRef.current || 80;
+    if (!note?.Length) return (60 / currentBpm) * 1000;
     // Length is a whole-note Fraction; * 4 → quarter-note beats.
     const beats = note.Length.RealValue * 4;
-    return Math.max(1, beats * (60 / bpm) * 1000); // never schedule 0 length
+    return Math.max(1, beats * (60 / currentBpm) * 1000); // never schedule 0 length
   };
 
   const setTimerForCurrentNote = (note = currentNote) => {
@@ -293,6 +300,8 @@ export default function PracticePage() {
             selectedPieceId={selectedPiece?.id}
             onChange={handlePieceChange}
           />
+
+          <BpmSlider bpm={bpm} onChange={setBpm} />
         </div>
 
         <PlayPauseControls
