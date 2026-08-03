@@ -1159,7 +1159,7 @@ export default function CelloPressureHeatmapUI() {
           {activeNav === "overview" ? (
             <OverviewPage liveData={liveData} />
           ) : activeNav === "practice" ? (
-            <PracticePage />
+            <PracticePage liveData={liveData} />
           ) : (
             <DetailPage activeNav={activeNav} liveData={liveData} />
           )}

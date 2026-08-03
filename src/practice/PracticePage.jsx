@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { OpenSheetMusicDisplay } from "opensheetmusicdisplay";
+import FingerboardPanel from "../FingerboardPanel.jsx";
 import { PRACTICE_PIECES } from "./practicePieces.js";
 import PlayPauseControls from "./PlayPauseControls.jsx";
 import ScoreDropdown from "./ScoreDropdown.jsx";
@@ -54,7 +55,7 @@ function frequencyToNote(frequency, maxCents = 50) {
 /**
  * Practice tab
  */
-export default function PracticePage() {
+export default function PracticePage({ liveData }) {
   const osmdRef = useRef(null);
   const containerRef = useRef(null);
   const timerRef = useRef(null);
@@ -127,8 +128,10 @@ export default function PracticePage() {
 
   useEffect(() => {
     let cancelled = false;
+    const container = containerRef.current;
+    if (!container) return undefined;
 
-    const osmd = new OpenSheetMusicDisplay(containerRef.current, {
+    const osmd = new OpenSheetMusicDisplay(container, {
       autoResize: false,
       backend: "svg",
       drawTitle: true,
@@ -188,7 +191,7 @@ export default function PracticePage() {
       isPlayingRef.current = false;
       setIsPlaying(false);
       osmdRef.current = null;
-      containerRef.current.innerHTML = "";
+      container.innerHTML = "";
     };
   }, [selectedPiece]);
 
@@ -265,7 +268,7 @@ export default function PracticePage() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 lg:p-6">
-      <div className="shrink-0 rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-[0_18px_50px_rgba(0,0,0,0.22)]">
+      {/* <div className="shrink-0 rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-[0_18px_50px_rgba(0,0,0,0.22)]">
         <div className="text-[10px] font-bold tracking-widest text-slate-500">PRACTICE</div>
         <div className="mt-2 text-2xl font-semibold text-slate-100">Practice</div>
         <p className="mt-2 max-w-xl text-sm text-slate-400">
@@ -275,24 +278,24 @@ export default function PracticePage() {
           {" "}
           {PRACTICE_PIECES.length} piece{PRACTICE_PIECES.length === 1 ? "" : "s"} available.
         </p>
-      </div>
+      </div> */}
 
-      <div className="flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 shadow-[0_18px_50px_rgba(0,0,0,0.22)] sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex shrink-0 flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 shadow-[0_18px_50px_rgba(0,0,0,0.22)] sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-center">
           <div className="flex min-w-0 items-center gap-3">
-            <span
+            {/* <span
               className={`h-2.5 w-2.5 shrink-0 rounded-full ${
                 isPlaying ? "bg-emerald-400" : scoreReady ? "bg-slate-500" : "bg-amber-400"
               }`}
-            />
-            <div className="min-w-0">
+            /> */}
+            {/* <div className="min-w-0">
               <div className="text-sm font-semibold text-slate-100">
                 {isPlaying ? "Playing" : scoreReady ? "Stopped" : status}
               </div>
               <div className="truncate text-xs text-slate-400">
                 {selectedPiece?.title ?? "No piece"} · {bpm} BPM · {status}
               </div>
-            </div>
+            </div> */}
           </div>
 
           <ScoreDropdown
@@ -314,7 +317,18 @@ export default function PracticePage() {
         />
       </div>
 
-      <div ref={containerRef} className="osmd-container w-full rounded-2xl bg-white p-3" />
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(320px,35%)]">
+        <div
+          ref={containerRef}
+          className="osmd-container min-h-[320px] w-full overflow-auto rounded-2xl bg-white p-3"
+        />
+        <div className="flex min-h-[520px] flex-col xl:min-h-[620px]">
+          <FingerboardPanel
+            pressure={liveData?.pressure ?? 0}
+            contacts={liveData?.contacts ?? []}
+          />
+        </div>
+      </div>
     </div>
   );
 }
