@@ -44,7 +44,12 @@ export function fingerboardPoint(col, rowPos) {
   };
 }
 
-export default function FingerboardPanel({ pressure, contacts = [], noteTargets = [] }) {
+export default function FingerboardPanel({
+  pressure,
+  contacts = [],
+  noteTargets = [],
+  practiceTargets = [],
+}) {
   const displayContacts = contacts.length ? contacts : [];
 
   return (
@@ -72,6 +77,36 @@ export default function FingerboardPanel({ pressure, contacts = [], noteTargets 
 
           {/* Heatmap SVG overlay in the same coordinate space as the photo */}
           <svg className="absolute inset-0 h-full w-full" viewBox={`0 0 ${FINGERBOARD_IMAGE_WIDTH} ${FINGERBOARD_IMAGE_HEIGHT}`}>
+            
+            {/* Practice score targets (where user should be pressing) */}
+            {practiceTargets.map((target, index) => {
+              const rowPos = target.row_pos ?? target.rowPos ?? target.row ?? 0;
+              const point = fingerboardPoint(target.col, rowPos);
+              const x = (point.x / 100) * FINGERBOARD_IMAGE_WIDTH;
+              const y = (point.y / 100) * FINGERBOARD_IMAGE_HEIGHT;
+              const label = target.note || "target";
+              const labelWidth = Math.max(92, label.length * 27 + 24);
+              return (
+                <g key={`practice-${target.col}-${rowPos}-${index}`}>
+                  <circle
+                    cx={x}
+                    cy={y}
+                    r="28"
+                    fill="none"
+                    stroke="#f59e0b"
+                    strokeWidth="5"
+                    strokeDasharray="14 10"
+                    opacity="0.95"
+                  />
+                  <circle cx={x} cy={y} r="12" fill="none" stroke="#fbbf24" strokeWidth="4" />
+                  <rect x={x + 26} y={y - 56} width={labelWidth} height="42" rx="12" fill="#78350f" opacity="0.9" />
+                  <text x={x + 38} y={y - 25} fontSize="25" fill="#fef3c7" fontWeight="800">
+                    {label}
+                  </text>
+                </g>
+              );
+            })}
+
             {/* Active sensor contacts */}
             {displayContacts.map((contact, index) => {
               const point = fingerboardPoint(contact.col, contact.row_pos);
