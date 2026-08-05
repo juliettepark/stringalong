@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { OpenSheetMusicDisplay } from "opensheetmusicdisplay";
 import FingerboardPanel from "../FingerboardPanel.jsx";
 import { PRACTICE_PIECES } from "./practicePieces.js";
+import { lookupFingerboardTarget } from "./pitchToFingerboard.js";
 import PlayPauseControls from "./PlayPauseControls.jsx";
 import ScoreDropdown from "./ScoreDropdown.jsx";
 import BpmSlider from "./BpmSlider.jsx";
@@ -69,6 +70,13 @@ export default function PracticePage({ liveData }) {
   const [currentNote, setCurrentNote] = useState(null);
 
   const scoreReady = status === "Ready";
+
+  const pitchName =
+    currentNote && typeof currentNote.isRest === "function" && !currentNote.isRest()
+      ? frequencyToNote(currentNote.pitch?.frequency)
+      : null;
+  const { target: practiceTarget, unmapped: unmappedPitch } = lookupFingerboardTarget(pitchName);
+  const practiceTargets = practiceTarget ? [practiceTarget] : [];
 
   // Keep refs in sync so timeouts don't see stale values from an old render.
   useEffect(() => {
@@ -322,10 +330,16 @@ export default function PracticePage({ liveData }) {
           ref={containerRef}
           className="osmd-container min-h-[320px] w-full overflow-auto rounded-2xl bg-white p-3"
         />
-        <div className="flex min-h-[520px] flex-col xl:min-h-[620px]">
+        <div className="flex min-h-[520px] flex-col gap-2 xl:min-h-[620px]">
+          {unmappedPitch ? (
+            <div className="shrink-0 text-xs text-amber-300">
+              No first-position mapping for {unmappedPitch}
+            </div>
+          ) : null}
           <FingerboardPanel
             pressure={liveData?.pressure ?? 0}
             contacts={liveData?.contacts ?? []}
+            practiceTargets={practiceTargets}
           />
         </div>
       </div>
