@@ -6,6 +6,9 @@ import { lookupFingerboardTarget } from "./pitchToFingerboard.js";
 import PlayPauseControls from "./PlayPauseControls.jsx";
 import ScoreDropdown from "./ScoreDropdown.jsx";
 import BpmSlider from "./BpmSlider.jsx";
+import LoopControls from "./LoopControls.jsx";
+
+const LOOP_COUNTDOWN_SECONDS = 3;
 
 /**
  * First-position cello pitches (A4 = 440 Hz), including open strings.
@@ -17,6 +20,7 @@ const CELLO_FIRST_POSITION_NOTES = [
   { note: "Eb2", frequency: 77.781746 },
   { note: "E2", frequency: 82.406889 },
   { note: "F2", frequency: 87.307058 },
+  // F#2 is extended 4th finger on the thickest string
   { note: "G2", frequency: 97.998859 },
   { note: "A2", frequency: 110.0 },
   { note: "Bb2", frequency: 116.54094 },
@@ -53,6 +57,22 @@ function frequencyToNote(frequency, maxCents = 50) {
   return bestCents <= maxCents ? best : null;
 }
 
+function getIterator(osmd) {
+  return osmd?.cursor?.Iterator ?? osmd?.cursor?.iterator ?? null;
+}
+
+function getCursorMeasureNumber(osmd) {
+  const iterator = getIterator(osmd);
+  const measure = iterator?.CurrentMeasure ?? iterator?.currentMeasure;
+  const value = Number(measure?.MeasureNumber ?? measure?.measureNumber);
+  return Number.isFinite(value) ? value : null;
+}
+
+function isEndReached(osmd) {
+  const iterator = getIterator(osmd);
+  return Boolean(iterator?.EndReached ?? iterator?.endReached);
+}
+
 /**
  * Practice tab
  */
@@ -60,14 +80,25 @@ export default function PracticePage({ liveData }) {
   const osmdRef = useRef(null);
   const containerRef = useRef(null);
   const timerRef = useRef(null);
-  // make a ref to ensure value is never stale for timer logic
+  const countdownTimerRef = useRef(null);
+  // Refs so timeouts don't see stale values from an old render.
   const isPlayingRef = useRef(false);
   const bpmRef = useRef(80);
+  const loopEnabledRef = useRef(false);
+  const loopStartRef = useRef(1);
+  const loopEndRef = useRef(1);
+  const measureCountRef = useRef(1);
+
   const [status, setStatus] = useState("Loading score…");
   const [bpm, setBpm] = useState(80);
   const [selectedPiece, setSelectedPiece] = useState(PRACTICE_PIECES[1]);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentNote, setCurrentNote] = useState(null);
+  const [loopEnabled, setLoopEnabled] = useState(false);
+  const [loopStartBar, setLoopStartBar] = useState(1);
+  const [loopEndBar, setLoopEndBar] = useState(1);
+  const [measureCount, setMeasureCount] = useState(1);
+  const [countdownRemaining, setCountdownRemaining] = useState(0);
 
   const scoreReady = status === "Ready";
 
@@ -78,7 +109,6 @@ export default function PracticePage({ liveData }) {
   const { target: practiceTarget, unmapped: unmappedPitch } = lookupFingerboardTarget(pitchName);
   const practiceTargets = practiceTarget ? [practiceTarget] : [];
 
-  // Keep refs in sync so timeouts don't see stale values from an old render.
   useEffect(() => {
     isPlayingRef.current = isPlaying;
   }, [isPlaying]);
@@ -87,11 +117,40 @@ export default function PracticePage({ liveData }) {
     bpmRef.current = bpm;
   }, [bpm]);
 
-  const clearTimer = () => {
+  useEffect(() => {
+    loopEnabledRef.current = loopEnabled;
+  }, [loopEnabled]);
+
+  useEffect(() => {
+    loopStartRef.current = loopStartBar;
+  }, [loopStartBar]);
+
+  useEffect(() => {
+    loopEndRef.current = loopEndBar;
+  }, [loopEndBar]);
+
+  useEffect(() => {
+    measureCountRef.current = measureCount;
+  }, [measureCount]);
+
+  const clearNoteTimer = () => {
     if (timerRef.current != null) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
+  };
+
+  const clearCountdown = () => {
+    if (countdownTimerRef.current != null) {
+      clearInterval(countdownTimerRef.current);
+      countdownTimerRef.current = null;
+    }
+  };
+
+  const clearAllPlaybackTimers = () => {
+    clearNoteTimer();
+    clearCountdown();
+    setCountdownRemaining(0);
   };
 
   const fixOsmdCursorSize = (osmd) => {
@@ -117,8 +176,30 @@ export default function PracticePage({ liveData }) {
     return Math.max(1, beats * (60 / currentBpm) * 1000); // never schedule 0 length
   };
 
+  const seekToMeasure = (measureNumber) => {
+    const osmd = osmdRef.current;
+    if (!osmd?.cursor) return null;
+
+    const maxMeasure = measureCountRef.current || 1;
+    const target = Math.min(maxMeasure, Math.max(1, Number(measureNumber) || 1));
+
+    osmd.cursor.reset();
+    osmd.cursor.show();
+
+    let guard = 0;
+    while (!isEndReached(osmd) && (getCursorMeasureNumber(osmd) ?? 1) < target) {
+      osmd.cursor.next();
+      guard += 1;
+    }
+
+    fixOsmdCursorSize(osmd);
+    const note = osmd.cursor.NotesUnderCursor()[0] ?? null;
+    setCurrentNote(note);
+    return note;
+  };
+
   const setTimerForCurrentNote = (note = currentNote) => {
-    clearTimer();
+    clearNoteTimer();
     if (!note) {
       console.error("No current note");
       return;
@@ -132,6 +213,35 @@ export default function PracticePage({ liveData }) {
     timerRef.current = setTimeout(() => {
       handleNext();
     }, dwellMs);
+  };
+
+  const startLoopCountdown = () => {
+    clearNoteTimer();
+    clearCountdown();
+
+    // Return cursor to loop start before the pause, not after.
+    seekToMeasure(loopStartRef.current);
+
+    setCountdownRemaining(LOOP_COUNTDOWN_SECONDS);
+
+    let remaining = LOOP_COUNTDOWN_SECONDS;
+    countdownTimerRef.current = setInterval(() => {
+      remaining -= 1;
+      if (remaining <= 0) {
+        clearCountdown();
+        setCountdownRemaining(0);
+        if (!isPlayingRef.current || !loopEnabledRef.current) return;
+
+        const note = osmdRef.current?.cursor?.NotesUnderCursor()[0] ?? null;
+        if (note) {
+          setTimerForCurrentNote(note);
+        } else {
+          handleStop();
+        }
+        return;
+      }
+      setCountdownRemaining(remaining);
+    }, 1000);
   };
 
   useEffect(() => {
@@ -168,13 +278,21 @@ export default function PracticePage({ liveData }) {
       try {
         isPlayingRef.current = false;
         setIsPlaying(false);
-        clearTimer();
+        clearAllPlaybackTimers();
         setStatus("Loading score…");
         await osmd.load(selectedPiece.musicXml);
         if (cancelled) return;
         osmd.render();
         osmd.cursor.reset();
         osmd.cursor.show();
+
+        const count = Math.max(1, osmd.Sheet?.SourceMeasures?.length || 1);
+        setMeasureCount(count);
+        setLoopStartBar(1);
+        setLoopEndBar(count);
+        loopStartRef.current = 1;
+        loopEndRef.current = count;
+        measureCountRef.current = count;
 
         fixOsmdCursorSize(osmd);
         const notes = osmd.cursor.NotesUnderCursor();
@@ -192,10 +310,9 @@ export default function PracticePage({ liveData }) {
 
     loadScore();
 
-    // Return cleanup function to remove old OSMD instance on unmount
     return () => {
       cancelled = true;
-      clearTimer();
+      clearAllPlaybackTimers();
       isPlayingRef.current = false;
       setIsPlaying(false);
       osmdRef.current = null;
@@ -224,7 +341,18 @@ export default function PracticePage({ liveData }) {
     // Use ref — timeout callbacks close over a stale isPlaying state value.
     if (!isPlayingRef.current) return;
 
-    if (osmd.cursor.Iterator.EndReached) {
+    const measureNumber = getCursorMeasureNumber(osmd);
+    const pastLoopEnd =
+      loopEnabledRef.current &&
+      (isEndReached(osmd) || (measureNumber != null && measureNumber > loopEndRef.current));
+
+    if (pastLoopEnd) {
+      console.log("Loop range finished — starting countdown");
+      startLoopCountdown();
+      return;
+    }
+
+    if (isEndReached(osmd)) {
       console.log("End of piece reached");
       handleStop();
       return;
@@ -238,21 +366,35 @@ export default function PracticePage({ liveData }) {
 
   const handlePlay = () => {
     if (!scoreReady) return;
+    clearCountdown();
+    setCountdownRemaining(0);
+
+    let note = currentNote;
+    if (loopEnabledRef.current) {
+      note = seekToMeasure(loopStartRef.current);
+    }
+
     isPlayingRef.current = true;
     setIsPlaying(true);
-    setTimerForCurrentNote(currentNote);
+    if (note) setTimerForCurrentNote(note);
   };
 
   const handlePause = () => {
-    clearTimer();
+    clearAllPlaybackTimers();
     isPlayingRef.current = false;
     setIsPlaying(false);
   };
 
   const handleStop = () => {
-    clearTimer();
+    clearAllPlaybackTimers();
     isPlayingRef.current = false;
     setIsPlaying(false);
+
+    if (loopEnabledRef.current) {
+      seekToMeasure(loopStartRef.current);
+      return;
+    }
+
     const osmd = osmdRef.current;
     if (!osmd?.cursor) return;
     osmd.cursor.reset();
@@ -268,7 +410,7 @@ export default function PracticePage({ liveData }) {
       return;
     }
 
-    clearTimer();
+    clearAllPlaybackTimers();
     isPlayingRef.current = false;
     setIsPlaying(false);
     setSelectedPiece(piece);
@@ -276,36 +418,8 @@ export default function PracticePage({ liveData }) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 lg:p-6">
-      {/* <div className="shrink-0 rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-[0_18px_50px_rgba(0,0,0,0.22)]">
-        <div className="text-[10px] font-bold tracking-widest text-slate-500">PRACTICE</div>
-        <div className="mt-2 text-2xl font-semibold text-slate-100">Practice</div>
-        <p className="mt-2 max-w-xl text-sm text-slate-400">
-          {selectedPiece
-            ? `Playing ${selectedPiece.title} (${selectedPiece.fileName}).`
-            : "Select a practice piece to begin."}
-          {" "}
-          {PRACTICE_PIECES.length} piece{PRACTICE_PIECES.length === 1 ? "" : "s"} available.
-        </p>
-      </div> */}
-
       <div className="flex shrink-0 flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 shadow-[0_18px_50px_rgba(0,0,0,0.22)] sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="flex min-w-0 items-center gap-3">
-            {/* <span
-              className={`h-2.5 w-2.5 shrink-0 rounded-full ${
-                isPlaying ? "bg-emerald-400" : scoreReady ? "bg-slate-500" : "bg-amber-400"
-              }`}
-            /> */}
-            {/* <div className="min-w-0">
-              <div className="text-sm font-semibold text-slate-100">
-                {isPlaying ? "Playing" : scoreReady ? "Stopped" : status}
-              </div>
-              <div className="truncate text-xs text-slate-400">
-                {selectedPiece?.title ?? "No piece"} · {bpm} BPM · {status}
-              </div>
-            </div> */}
-          </div>
-
+        <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
           <ScoreDropdown
             pieces={PRACTICE_PIECES}
             selectedPieceId={selectedPiece?.id}
@@ -313,6 +427,18 @@ export default function PracticePage({ liveData }) {
           />
 
           <BpmSlider bpm={bpm} onChange={setBpm} />
+
+          <LoopControls
+            enabled={loopEnabled}
+            startBar={loopStartBar}
+            endBar={loopEndBar}
+            measureCount={measureCount}
+            countdownRemaining={countdownRemaining}
+            disabled={!scoreReady}
+            onEnabledChange={setLoopEnabled}
+            onStartBarChange={setLoopStartBar}
+            onEndBarChange={setLoopEndBar}
+          />
         </div>
 
         <PlayPauseControls
