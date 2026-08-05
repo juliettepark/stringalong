@@ -37,14 +37,14 @@ export default function PlayPauseControls({
       >
         Stop
       </button>
-      <button
+      {/* <button
         type="button"
         disabled={!scoreReady}
         onClick={onNext}
         className="rounded-lg bg-blue-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-40"
       >
         Next
-      </button>
+      </button> */}
     </div>
   );
 }

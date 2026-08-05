@@ -7,6 +7,7 @@ import PlayPauseControls from "./PlayPauseControls.jsx";
 import ScoreDropdown from "./ScoreDropdown.jsx";
 import BpmSlider from "./BpmSlider.jsx";
 import LoopControls from "./LoopControls.jsx";
+import PressureThresholdIndicator from "./PressureThresholdIndicator.jsx";
 
 const LOOP_COUNTDOWN_SECONDS = 3;
 
@@ -417,9 +418,10 @@ export default function PracticePage({ liveData }) {
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 lg:p-6">
-      <div className="flex shrink-0 flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 shadow-[0_18px_50px_rgba(0,0,0,0.22)] sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+    <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-y-auto p-4 lg:p-6 xl:grid-cols-[minmax(0,1fr)_minmax(320px,35%)]">
+      {/* Left column: controls → transport → score */}
+      <div className="flex min-h-0 min-w-0 flex-col gap-3">
+        <div className="flex shrink-0 flex-wrap items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 shadow-[0_18px_50px_rgba(0,0,0,0.22)]">
           <ScoreDropdown
             pieces={PRACTICE_PIECES}
             selectedPieceId={selectedPiece?.id}
@@ -441,27 +443,35 @@ export default function PracticePage({ liveData }) {
           />
         </div>
 
-        <PlayPauseControls
-          scoreReady={scoreReady}
-          isPlaying={isPlaying}
-          onPlay={handlePlay}
-          onPause={handlePause}
-          onStop={handleStop}
-          onNext={handleNext}
+        <div className="flex shrink-0 justify-center">
+          <PlayPauseControls
+            scoreReady={scoreReady}
+            isPlaying={isPlaying}
+            onPlay={handlePlay}
+            onPause={handlePause}
+            onStop={handleStop}
+            onNext={handleNext}
+          />
+        </div>
+
+        <div
+          ref={containerRef}
+          className="osmd-container min-h-[320px] w-full flex-1 overflow-auto rounded-2xl bg-white p-3"
         />
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(320px,35%)]">
-        <div
-          ref={containerRef}
-          className="osmd-container min-h-[320px] w-full overflow-auto rounded-2xl bg-white p-3"
-        />
-        <div className="flex min-h-[520px] flex-col gap-2 xl:min-h-[620px]">
+      {/* Right column: pressure cue → fingerboard */}
+      <div className="flex min-h-0 min-w-0 flex-col gap-3">
+        <div className="flex shrink-0 items-center justify-center gap-3 rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3">
+          <PressureThresholdIndicator pressure={liveData?.pressure ?? 0} />
           {unmappedPitch ? (
-            <div className="shrink-0 text-xs text-amber-300">
+            <div className="text-xs text-amber-300">
               No first-position mapping for {unmappedPitch}
             </div>
           ) : null}
+        </div>
+
+        <div className="flex min-h-[520px] flex-1 flex-col xl:min-h-[620px]">
           <FingerboardPanel
             pressure={liveData?.pressure ?? 0}
             contacts={liveData?.contacts ?? []}
