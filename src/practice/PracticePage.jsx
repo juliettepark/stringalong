@@ -8,6 +8,7 @@ import ScoreDropdown from "./ScoreDropdown.jsx";
 import BpmSlider from "./BpmSlider.jsx";
 import LoopControls from "./LoopControls.jsx";
 import PressureThresholdIndicator from "./PressureThresholdIndicator.jsx";
+import PracticeTuningIndicator from "./PracticeTuningIndicator.jsx";
 
 const LOOP_COUNTDOWN_SECONDS = 3;
 
@@ -462,14 +463,17 @@ export default function PracticePage({ liveData }) {
 
       {/* Right column: pressure cue → fingerboard */}
       <div className="flex min-h-0 min-w-0 flex-col gap-3">
-        <div className="flex shrink-0 items-center justify-center gap-3 rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3">
-          <PressureThresholdIndicator pressure={liveData?.pressure ?? 0} />
-          {unmappedPitch ? (
-            <div className="text-xs text-amber-300">
-              No first-position mapping for {unmappedPitch}
-            </div>
-          ) : null}
+        <div className="grid w-full shrink-0 grid-cols-4 items-center rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3">
+          <PracticeTuningIndicator liveData={liveData} scorePitchName={pitchName} />
+          <div className="flex justify-center">
+            <PressureThresholdIndicator pressure={liveData?.pressure ?? 0} />
+          </div>
         </div>
+        {unmappedPitch ? (
+          <div className="text-xs text-amber-300">
+            No first-position mapping for {unmappedPitch}
+          </div>
+        ) : null}
 
         <div className="flex min-h-[520px] flex-1 flex-col xl:min-h-[620px]">
           <FingerboardPanel
