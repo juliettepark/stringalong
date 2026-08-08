@@ -9,6 +9,8 @@ import BpmSlider from "./BpmSlider.jsx";
 import LoopControls from "./LoopControls.jsx";
 import PressureThresholdIndicator from "./PressureThresholdIndicator.jsx";
 import PracticeTuningIndicator from "./PracticeTuningIndicator.jsx";
+import RecordToggle from "./RecordToggle.jsx";
+import { buildRecordingRow, rowsToCsv, downloadCsv } from "./recordingCsv.js";
 
 const LOOP_COUNTDOWN_SECONDS = 3;
 
@@ -91,6 +93,14 @@ export default function PracticePage({ liveData }) {
   const loopEndRef = useRef(1);
   const measureCountRef = useRef(1);
 
+  // RECORDING FIELDS
+  const liveDataRef = useRef(liveData);
+  const isRecordingRef = useRef(false);
+  const recordEnabledRef = useRef(false);
+  const rowsRef = useRef([]);
+  const recordingStartedAtRef = useRef(null);
+  const selectedPieceRef = useRef(null);
+
   const [status, setStatus] = useState("Loading score…");
   const [bpm, setBpm] = useState(80);
   const [selectedPiece, setSelectedPiece] = useState(PRACTICE_PIECES[1]);
@@ -101,6 +111,9 @@ export default function PracticePage({ liveData }) {
   const [loopEndBar, setLoopEndBar] = useState(1);
   const [measureCount, setMeasureCount] = useState(1);
   const [countdownRemaining, setCountdownRemaining] = useState(0);
+  const [recordEnabled, setRecordEnabled] = useState(false);
+
+  selectedPieceRef.current = selectedPiece;
 
   const scoreReady = status === "Ready";
 
@@ -135,6 +148,14 @@ export default function PracticePage({ liveData }) {
     measureCountRef.current = measureCount;
   }, [measureCount]);
 
+  useEffect(() => {
+    liveDataRef.current = liveData;
+  }, [liveData]);
+
+  useEffect(() => {
+    recordEnabledRef.current = recordEnabled;
+  }, [recordEnabled]);
+
   const clearNoteTimer = () => {
     if (timerRef.current != null) {
       clearTimeout(timerRef.current);
@@ -153,6 +174,48 @@ export default function PracticePage({ liveData }) {
     clearNoteTimer();
     clearCountdown();
     setCountdownRemaining(0);
+  };
+
+  const captureFrame = (note) => {
+    if (!isRecordingRef.current) return;
+
+    const row = buildRecordingRow(
+      note,
+      liveDataRef.current,
+      {
+        startedAtMs: recordingStartedAtRef.current,
+        pieceId: selectedPieceRef.current?.id ?? "",
+        bpm: bpmRef.current,
+        loopEnabled: loopEnabledRef.current,
+        loopStart: loopStartRef.current,
+        loopEnd: loopEndRef.current,
+        measureNumber: getCursorMeasureNumber(osmdRef.current),
+      },
+      frequencyToNote,
+    );
+    rowsRef.current.push(row);
+  };
+
+  const startRecordingSession = (note) => {
+    rowsRef.current = [];
+    recordingStartedAtRef.current = Date.now();
+    isRecordingRef.current = true;
+    captureFrame(note);
+  };
+
+  const finishRecordingSession = () => {
+    if (!isRecordingRef.current) return;
+
+    const rows = rowsRef.current;
+    isRecordingRef.current = false;
+    recordingStartedAtRef.current = null;
+    rowsRef.current = [];
+
+    if (!rows.length) return;
+
+    const pieceId = selectedPieceRef.current?.id || "practice";
+    const filename = `practice-${pieceId}-${Date.now()}.csv`;
+    downloadCsv(filename, rowsToCsv(rows));
   };
 
   const fixOsmdCursorSize = (osmd) => {
@@ -222,7 +285,7 @@ export default function PracticePage({ liveData }) {
     clearCountdown();
 
     // Return cursor to loop start before the pause, not after.
-    seekToMeasure(loopStartRef.current);
+    const loopNote = seekToMeasure(loopStartRef.current);
 
     setCountdownRemaining(LOOP_COUNTDOWN_SECONDS);
 
@@ -237,6 +300,8 @@ export default function PracticePage({ liveData }) {
         const note = osmdRef.current?.cursor?.NotesUnderCursor()[0] ?? null;
         if (note) {
           setTimerForCurrentNote(note);
+          // Mirror handleNext to capture frame after note begins
+          captureFrame(loopNote);
         } else {
           handleStop();
         }
@@ -317,6 +382,7 @@ export default function PracticePage({ liveData }) {
       clearAllPlaybackTimers();
       isPlayingRef.current = false;
       setIsPlaying(false);
+      finishRecordingSession();
       osmdRef.current = null;
       container.innerHTML = "";
     };
@@ -364,6 +430,8 @@ export default function PracticePage({ liveData }) {
     setCurrentNote(nextNote);
     // Pass the note in — setState is async, so currentNote is still the old one here.
     setTimerForCurrentNote(nextNote);
+    // Capture frame last
+    captureFrame(nextNote);
   };
 
   const handlePlay = () => {
@@ -371,9 +439,16 @@ export default function PracticePage({ liveData }) {
     clearCountdown();
     setCountdownRemaining(0);
 
+    // Set to first note if we are in a loop
     let note = currentNote;
     if (loopEnabledRef.current) {
       note = seekToMeasure(loopStartRef.current);
+    }
+
+    // Start recording new only if loop has begun and rows are empty (brand new play)
+    // Otherwise, we continue the existing session
+    if (recordEnabledRef.current && rowsRef.current.length === 0) {
+      startRecordingSession(note);
     }
 
     isPlayingRef.current = true;
@@ -391,6 +466,7 @@ export default function PracticePage({ liveData }) {
     clearAllPlaybackTimers();
     isPlayingRef.current = false;
     setIsPlaying(false);
+    finishRecordingSession();
 
     if (loopEnabledRef.current) {
       seekToMeasure(loopStartRef.current);
@@ -415,6 +491,7 @@ export default function PracticePage({ liveData }) {
     clearAllPlaybackTimers();
     isPlayingRef.current = false;
     setIsPlaying(false);
+    finishRecordingSession();
     setSelectedPiece(piece);
   };
 
@@ -444,7 +521,12 @@ export default function PracticePage({ liveData }) {
           />
         </div>
 
-        <div className="flex shrink-0 justify-center">
+        <div className="flex shrink-0 items-center justify-center gap-4">
+          <RecordToggle
+            enabled={recordEnabled}
+            disabled={!scoreReady}
+            onChange={setRecordEnabled}
+          />
           <PlayPauseControls
             scoreReady={scoreReady}
             isPlaying={isPlaying}
