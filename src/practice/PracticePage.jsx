@@ -11,6 +11,15 @@ import PressureThresholdIndicator from "./PressureThresholdIndicator.jsx";
 import PracticeTuningIndicator from "./PracticeTuningIndicator.jsx";
 import RecordToggle from "./RecordToggle.jsx";
 import { buildRecordingRow, rowsToCsv, downloadCsv } from "./recordingCsv.js";
+import {
+  startAvRecording,
+  pauseAvRecording,
+  resumeAvRecording,
+  stopAvRecordingAndDownload,
+  discardAvRecording,
+  isAvActive,
+  isAvPaused,
+} from "./avRecorder.js";
 
 const LOOP_COUNTDOWN_SECONDS = 3;
 
@@ -100,6 +109,8 @@ export default function PracticePage({ liveData }) {
   const rowsRef = useRef([]);
   const recordingStartedAtRef = useRef(null);
   const selectedPieceRef = useRef(null);
+  const avEnabledRef = useRef(false);
+  // const previewVideoRef = useRef(null);
 
   const [status, setStatus] = useState("Loading score…");
   const [bpm, setBpm] = useState(80);
@@ -112,6 +123,8 @@ export default function PracticePage({ liveData }) {
   const [measureCount, setMeasureCount] = useState(1);
   const [countdownRemaining, setCountdownRemaining] = useState(0);
   const [recordEnabled, setRecordEnabled] = useState(false);
+  const [avEnabled, setAvEnabled] = useState(false);
+  const [avError, setAvError] = useState("");
 
   selectedPieceRef.current = selectedPiece;
 
@@ -155,6 +168,35 @@ export default function PracticePage({ liveData }) {
   useEffect(() => {
     recordEnabledRef.current = recordEnabled;
   }, [recordEnabled]);
+
+  useEffect(() => {
+    avEnabledRef.current = avEnabled;
+  }, [avEnabled]);
+
+  // const clearPreview = () => {
+  //   const video = previewVideoRef.current;
+  //   if (video) {
+  //     video.srcObject = null;
+  //   }
+  // };
+
+  // const attachPreview = (mediaStream) => {
+  //   const video = previewVideoRef.current;
+  //   if (!video || !mediaStream) return;
+  //   video.srcObject = mediaStream;
+  //   video.play?.().catch(() => {});
+  // };
+
+  const finishAvSession = async () => {
+    if (!isAvActive() && !isAvPaused()) {
+      // clearPreview();
+      return;
+    }
+    const pieceId = selectedPieceRef.current?.id || "practice";
+    const filename = `practice-${pieceId}-${Date.now()}.webm`;
+    await stopAvRecordingAndDownload(filename);
+    // clearPreview();
+  };
 
   const clearNoteTimer = () => {
     if (timerRef.current != null) {
@@ -383,6 +425,8 @@ export default function PracticePage({ liveData }) {
       isPlayingRef.current = false;
       setIsPlaying(false);
       finishRecordingSession();
+      discardAvRecording();
+      // clearPreview();
       osmdRef.current = null;
       container.innerHTML = "";
     };
@@ -434,12 +478,13 @@ export default function PracticePage({ liveData }) {
     captureFrame(nextNote);
   };
 
-  const handlePlay = () => {
+  const handlePlay = async () => {
     if (!scoreReady) return;
     clearCountdown();
     setCountdownRemaining(0);
+    setAvError("");
 
-    // Set to first note if we are in a loop
+    // Set back to first note if we are in a loop
     let note = currentNote;
     if (loopEnabledRef.current) {
       note = seekToMeasure(loopStartRef.current);
@@ -451,6 +496,20 @@ export default function PracticePage({ liveData }) {
       startRecordingSession(note);
     }
 
+    if (avEnabledRef.current) {
+      try {
+        if (isAvPaused()) {
+          resumeAvRecording();
+        } else if (!isAvActive()) {
+          await startAvRecording();
+          // attachPreview(mediaStream);
+        }
+      } catch (error) {
+        console.error(error);
+        setAvError("Camera/mic permission denied or unavailable");
+      }
+    }
+
     isPlayingRef.current = true;
     setIsPlaying(true);
     if (note) setTimerForCurrentNote(note);
@@ -460,13 +519,15 @@ export default function PracticePage({ liveData }) {
     clearAllPlaybackTimers();
     isPlayingRef.current = false;
     setIsPlaying(false);
+    pauseAvRecording();
   };
 
-  const handleStop = () => {
+  const handleStop = async () => {
     clearAllPlaybackTimers();
     isPlayingRef.current = false;
     setIsPlaying(false);
     finishRecordingSession();
+    await finishAvSession();
 
     if (loopEnabledRef.current) {
       seekToMeasure(loopStartRef.current);
@@ -481,7 +542,7 @@ export default function PracticePage({ liveData }) {
     setCurrentNote(osmd.cursor.NotesUnderCursor()[0] ?? null);
   };
 
-  const handlePieceChange = (event) => {
+  const handlePieceChange = async (event) => {
     const piece = PRACTICE_PIECES.find((p) => p.id === event.target.value);
     if (!piece || piece.id === selectedPiece?.id) {
       console.log("Unable to find piece corresponding to id:", event.target.value);
@@ -492,6 +553,7 @@ export default function PracticePage({ liveData }) {
     isPlayingRef.current = false;
     setIsPlaying(false);
     finishRecordingSession();
+    await finishAvSession();
     setSelectedPiece(piece);
   };
 
@@ -521,20 +583,41 @@ export default function PracticePage({ liveData }) {
           />
         </div>
 
-        <div className="flex shrink-0 items-center justify-center gap-4">
-          <RecordToggle
-            enabled={recordEnabled}
-            disabled={!scoreReady}
-            onChange={setRecordEnabled}
-          />
-          <PlayPauseControls
-            scoreReady={scoreReady}
-            isPlaying={isPlaying}
-            onPlay={handlePlay}
-            onPause={handlePause}
-            onStop={handleStop}
-            onNext={handleNext}
-          />
+        <div className="flex shrink-0 flex-col items-center gap-2">
+          <div className="flex flex-wrap items-center justify-center gap-4">
+            <RecordToggle
+              enabled={recordEnabled}
+              disabled={!scoreReady}
+              onChange={setRecordEnabled}
+              label="SAVE CSV"
+              ariaLabel="Save session CSV when playing"
+            />
+            <RecordToggle
+              enabled={avEnabled}
+              disabled={!scoreReady}
+              onChange={setAvEnabled}
+              label="SAVE AV"
+              ariaLabel="Save camera and microphone recording when playing"
+            />
+            <PlayPauseControls
+              scoreReady={scoreReady}
+              isPlaying={isPlaying}
+              onPlay={handlePlay}
+              onPause={handlePause}
+              onStop={handleStop}
+              onNext={handleNext}
+            />
+          </div>
+          {avError ? <div className="text-xs text-amber-300">{avError}</div> : null}
+          {/* <video
+            ref={previewVideoRef}
+            muted
+            playsInline
+            autoPlay
+            className={`h-24 w-32 rounded-lg border border-slate-700 bg-slate-950 object-cover ${
+              avEnabled ? "block" : "hidden"
+            }`}
+          /> */}
         </div>
 
         <div
