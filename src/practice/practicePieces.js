@@ -1,5 +1,7 @@
 import cMajorMusicXml from "../../music_data/CMajor.musicxml?raw";
 import minuetAnnaMagdalenaMusicXml from "../../music_data/Minuet from Anna Magdalena Notebook.musicxml?raw";
+import songOfTheWindMusicXml from "../../music_data/Song of the Wind.musicxml?raw";
+import longLongAgoMusicXml from "../../music_data/Long, Long Ago.musicxml?raw";
 
 /**
  * Catalog of practice scores available in the Practice tab.
@@ -23,6 +25,18 @@ export const PRACTICE_PIECES = [
     title: "Minuet from Anna Magdalena Notebook",
     fileName: "Minuet from Anna Magdalena Notebook.musicxml",
     musicXml: minuetAnnaMagdalenaMusicXml,
+  },
+  {
+    id: "song-of-the-wind",
+    title: "Song of the Wind",
+    fileName: "Song of the Wind.musicxml",
+    musicXml: songOfTheWindMusicXml,
+  },
+  {
+    id: "long-long-ago",
+    title: "Long, Long Ago",
+    fileName: "Long, Long Ago.musicxml",
+    musicXml: longLongAgoMusicXml,
   },
 ];
 
