@@ -1,4 +1,5 @@
-import cMajorMusicXml from "../../music_data/CMajor.musicxml?raw";
+// import cMajorMusicXml from "../../music_data/CMajor.musicxml?raw";
+import cMajorScaleMusicXml from "../../music_data/C Major Scale.musicxml?raw";
 import minuetAnnaMagdalenaMusicXml from "../../music_data/Minuet from Anna Magdalena Notebook.musicxml?raw";
 import songOfTheWindMusicXml from "../../music_data/Song of the Wind.musicxml?raw";
 import longLongAgoMusicXml from "../../music_data/Long, Long Ago.musicxml?raw";
@@ -14,11 +15,17 @@ import longLongAgoMusicXml from "../../music_data/Long, Long Ago.musicxml?raw";
  * - musicXml: MusicXML string (Vite ?raw import)
  */
 export const PRACTICE_PIECES = [
+  // {
+  //   id: "c-major",
+  //   title: "CMajor",
+  //   fileName: "CMajor.musicxml",
+  //   musicXml: cMajorMusicXml,
+  // },
   {
-    id: "c-major",
+    id: "c-major-scale",
     title: "C Major Scale",
-    fileName: "CMajor.musicxml",
-    musicXml: cMajorMusicXml,
+    fileName: "C Major Scale.musicxml",
+    musicXml: cMajorScaleMusicXml,
   },
   {
     id: "minuet-anna-magdalena",
